@@ -1,0 +1,14 @@
+\stitle{QProduct Node,} such as $n_2$ in \Cref{fig:qspn}, splits $\Aset_n$ into several subsets $\{\Aset_{n,1},\Aset_{n,2},\ldots,\Aset_{n,c_n}\}$ by $CQA_{Q_n}(A_i,A_j),\forall A_i,A_j\in\Aset_n$ matrix. So $T_n$ and $Q_n$ remains unsplit and $P_{T_n,Q_n}(\Aset_n)=\prod_{1\leq k\leq c_n}P_{T_n,Q_n}(\Aset_{n,k})$.
+
+% QProduct splits column set $\Aset$ into several subsets $\Aset_1, \Aset_2,\ldots$ where workload $Q$ has low access on the correlation between any two of them. 
+
+QProduct which splits columns is a lossy operation because the access of workload $Q_n$ on some columns may be ignored. To alleviate this problem, QProduct nodes split columns with as low loss as possible. The loss of QProduct is quantified with $CQA$ matrix: $\sum_{x,y}\sum_{i,j}CQA_{Q_n}(A_i,A_j)|A_i\in\Aset_x,A_j\in\Aset_y,x\neq y$ where $\Aset_x,\Aset_y\subset\Aset$. 
+
+% However, when workload $Q$ has high access on all columns, QProduct cannot split columns directly within reasonable loss.
+
+\stitle{QSplit Node,} such as $n_1$ in \Cref{fig:qspn}, splits $Q_n$ into several subsets $\{Q_{n,1},Q_{n,2},\ldots,Q_{n,c_n}\}$ according to the basic idea of QSplit. Note that a QSplit node essentially acts as a query classifier which finds the workload subset $Q_{n,k_0}$ best matching query $q$ and returns the corresponding probability. So $\Aset_n$ and $T_n$ remains unsplit and the probability on node $n$ is only meaningful when a query $q$ is given: $P_{T_n,Q_n}(q_{\Aset_n})=P_{T_n,Q_{n,k_0}}(q_{\Aset_n})$ where $1\leq k_0\leq c_n$ and $Q_{n,k_0}$ is best matching $q$.
+
+QSplit splits queries of $Q_n$ into several subsets $Q_{n,1},\ldots,Q_{n,c_n}$ to against the case when workload $Q$ has high access on all columns so that columns cannot be split by QProduct within reasonable loss. As explained in basic idea, splitting $Q$ into subsets leads to $CQA_{Q_{n,1}},\ldots,CQA_{Q_{n,c_n}}$ with smaller values, which reduces the loss of QProduct nodes on $Q_{n,1},\ldots,Q_{n,c_n}$. Thus, the goal of QSplit is maximize the effect of $CQA$ reduction i.e. minimize $\Bar{\sum}_{A_i,A_j\in\Aset_n}CQA_{Q_{n,k}}(A_i,A_j),Q_{n,k}\subset Q$.
+
+Although the whole workload $Q$ has high access on all columns, each query of $Q$ usually has constrains only on a few columns of $\Aset$. For example, given $\Aset={A_1,A_2,A_3,A_3,A_4}$ and $Q$ containing different queries with constrains on one of $\{A_1,A_2\}$, $\{A_3,A_4\}$, $\{A_1,A_3\}$ and $\{A_2,A_4\}$, workload $Q$ has high access on the whole $\Aset$. After splitting $Q$ by different kinds of constraints, the workload subsets access on columns are reduced a lot so that QProduct can split columns by these workload subsets respectively. 
+
