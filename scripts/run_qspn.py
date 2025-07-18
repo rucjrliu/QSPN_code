@@ -171,8 +171,6 @@ if __name__ == '__main__':
 
     if args.train:
         print('Train {} on data:{} workload:{}_{}'.format(args.model, args.dataset, args.corr, args.skew))
-        # with open('liujw_train_spn_fspn_qspn.log', 'a') as dumplog:
-        #     dumplog.write('Train {} on data:{} workload:{}_{}\n'.format(args.model, args.dataset, args.corr, args.skew))
         sample_data = data.values.astype(int)
         #print(type(data), data.shape)
         #print(type(sample_data), sample_data.shape)
@@ -246,8 +244,6 @@ if __name__ == '__main__':
             pickle.dump(model, open(model_save_path, "wb"), pickle.HIGHEST_PROTOCOL)
         print('----------------------------------------------------------------------------------------------------------------')
         print('Train Time: {} min.'.format(train_time / 60))
-        # with open('liujw_train_spn_fspn_qspn.log', 'a') as dumplog:
-        #     dumplog.write('Train Time: {} min.\n'.format(train_time / 60))
 
     if args.inference:
         results = []
@@ -286,9 +282,6 @@ if __name__ == '__main__':
         model.store_factorize_as_dict()
 
         est_card = []
-        # dumplog = open('liujw_main_exp.log', 'a')
-        # dumplog.write('{} - query_{}_{}_{}_0.0 - {}:\n'.format(args.dataset, args.query_root, args.skew, args.corr, args.model))
-        # dumplog.write(f"Model Size: {model_size/1000} KB\n")
         if args.model == 'qspn':
             
             #est_card = model.probability((workload[:,:,0],workload[:,:,1]), calculated=dict()) * cardinality

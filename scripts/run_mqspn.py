@@ -33,8 +33,7 @@ except:
 
     perf_counter = time
 
-#dataset_root = '/home/liujw/qspn/ourspn/data'
-#model_save_root = '/home/liujw/qspn/ourspn/models/multi_tables'
+
 dataset_root = settings.DATA_ROOT
 model_save_root = os.path.join(settings.MODEL_ROOT, "multi_tables")
 
