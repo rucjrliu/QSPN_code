@@ -15,7 +15,7 @@ from Structure.nodes import Product, Sum, Factorize, Leaf, QSum
 from Structure.leaves.fspn_leaves.Multi_Histograms import Multi_histogram, multidim_cumsum
 from Structure.leaves.fspn_leaves.Histograms import Histogram
 from Structure.leaves.fspn_leaves.Merge_leaves import Merge_leaves
-from Structure.nodes import liujw_qsplit_maxcut_which_childi
+from Structure.nodes import qsplit_maxcut_which_childi
 from Learning.splitting.Workload import get_workload_attr_matrix, get_workload_by_scope
 from Learning.splitting.Workload import get_workload_by_datadom, get_workload_by_data
 from networkx.convert_matrix import from_numpy_matrix

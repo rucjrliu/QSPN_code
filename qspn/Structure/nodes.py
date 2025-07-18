@@ -160,7 +160,7 @@ class Factorize(Node):
 class Leaf(Node):
     def __init__(self, scope=None, condition=None, cardinality=0):
         Node.__init__(self)
-        self.factor_join_buckets = None
+        self.join_buckets = None
         #self.nonnan_cardinality = None
         if scope is not None:
             if type(scope) == int:
@@ -180,7 +180,6 @@ class Leaf(Node):
         self.cardinality = cardinality
 
         _, self.scope_idx, self.condition_idx = convert_to_scope_domain(self.scope, self.condition)
-        #self.factor_join_buckets = None
 
     def query(self, query, attr):
         raise NotImplemented
@@ -317,7 +316,7 @@ def bfs_print(root, func):
                     func(node, c)
                     queue.append(c)
 
-def liujw_qspn_bfs(root, query, func):
+def qspn_bfs(root, query, func):
     seen, queue = set([root]), collections.deque([root])
     while queue:
         node = queue.popleft()
@@ -362,8 +361,8 @@ def get_topological_order(node):
     assert len(L) == len(nodes), "Graph is not DAG, it has at least one cycle"
     return L
 
-def liujw_qspn_get_topological_order(node, query):
-    nodes = liujw_qspn_get_nodes_by_type(node, query)
+def qspn_get_topological_order(node, query):
+    nodes = qspn_get_nodes_by_type(node, query)
     #print(nodes)
     #print()
 
@@ -473,10 +472,10 @@ def print_spn_structure(root, ntype=Node):
 
     return result
 
-def liujw_qsum_which_child_dis(node, child_i, vec_q):
+def qsum_which_child_dis(node, child_i, vec_q):
     return np.linalg.norm(node.cluster_centers[child_i] - vec_q[0])
 
-def liujw_qsum_which_child(node, query):
+def qsum_which_child(node, query):
     array_q = np.dstack(query)
     #array_q = array_q.reshape(1, array_q.shape[0], array_q.shape[1])
     vec_q = preproc_queries(array_q, node.scope)
@@ -484,15 +483,15 @@ def liujw_qsum_which_child(node, query):
     min_dis = None
     for i in range(len(node.children)):
         c = node.children[i]
-        dis = liujw_qsum_which_child_dis(node, i, vec_q)
+        dis = qsum_which_child_dis(node, i, vec_q)
         if min_dis is None or dis < min_dis:
             min_dis = dis
             x = [c]
     assert len(x) == 1
     return x
 
-LIUJW_QSPLIT_SCORE_RATIO = 0.0
-def liujw_qsplit_maxcut_cover_score(node, i, query):
+QSPLIT_SCORE_RATIO = 0.0
+def qsplit_maxcut_cover_score(node, i, query):
     #query predicates on node.scope
     query_pred = [1] * len(node.scope)
     pred_n = len(query[0])
@@ -522,14 +521,14 @@ def liujw_qsplit_maxcut_cover_score(node, i, query):
     if exact_score == query_pred_one_n:
         return exact_score
     else:
-        return LIUJW_QSPLIT_SCORE_RATIO * exact_score + (1 - LIUJW_QSPLIT_SCORE_RATIO) * fuzzy_score
+        return QSPLIT_SCORE_RATIO * exact_score + (1 - QSPLIT_SCORE_RATIO) * fuzzy_score
 
-def liujw_qsplit_maxcut_which_child(node, query):
+def qsplit_maxcut_which_child(node, query):
     x = []
     opt_score = -1
     for i in range(len(node.children)):
         c = node.children[i]
-        score = liujw_qsplit_maxcut_cover_score(node, i, query)
+        score = qsplit_maxcut_cover_score(node, i, query)
         if score > opt_score:
             opt_score = score
             x = [c]
@@ -547,18 +546,18 @@ def liujw_qsplit_maxcut_which_child(node, query):
     #         print(query_pred, opt_score)
     return x
 
-def liujw_qsplit_maxcut_which_childi(node, query):
+def qsplit_maxcut_which_childi(node, query):
     x = []
     opt_score = -1
     for i in range(len(node.children)):
-        score = liujw_qsplit_maxcut_cover_score(node, i, query)
+        score = qsplit_maxcut_cover_score(node, i, query)
         if score > opt_score:
             opt_score = score
             x = [i]
     assert len(x) == 1
     return x
 
-def liujw_qspn_get_nodes_by_type(node, query, ntype=Node):
+def qspn_get_nodes_by_type(node, query, ntype=Node):
     assert node is not None
 
     result = []
@@ -575,9 +574,9 @@ def liujw_qspn_get_nodes_by_type(node, query, ntype=Node):
                 assert len(node.cluster_centers) >= 2
                 assert len(query[0]) == len(query[1]) == 1
                 if type(node.cluster_centers[0]) == list:
-                    children = liujw_qsplit_maxcut_which_child(node, query)
+                    children = qsplit_maxcut_which_child(node, query)
                 else:
-                    children = liujw_qsum_which_child(node, query)
+                    children = qsum_which_child(node, query)
                 #print(children)
                 #exit(-1)
             else:
@@ -586,7 +585,7 @@ def liujw_qspn_get_nodes_by_type(node, query, ntype=Node):
             result.append((node, children))
         return children
     #print(result)
-    liujw_qspn_bfs(node, query, AddNode_toVisitChildren)
+    qspn_bfs(node, query, AddNode_toVisitChildren)
     #print(result)
     #exit(-1)
 

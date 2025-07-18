@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from copy import deepcopy
-from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, liujw_qsplit_maxcut_which_child
+from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, qsplit_maxcut_which_child
 from Structure.StatisticalTypes import MetaType
 from Structure.leaves.fspn_leaves.Merge_leaves import Merge_leaves
 from Learning.validity import is_valid
@@ -30,7 +30,7 @@ def get_fjbuckets_bfs(query, join_scope: list, subroot, attr, this_table_domain:
         f += 1
         #print(node)
         if isinstance(node, Leaf):
-            result.append(leaf_select_FJBuckets_opt(join_scope, node.factor_join_buckets, None, this_table_domain))
+            result.append(leaf_select_FJBuckets_opt(join_scope, node.join_buckets, None, this_table_domain))
         elif isinstance(node, Product):
             result.append([])
             for i in node.children:
@@ -45,7 +45,7 @@ def get_fjbuckets_bfs(query, join_scope: list, subroot, attr, this_table_domain:
             for i in join_scope:
                 query_join[0][0, i] = -1
                 query_join[1][0, i] = -1
-            children = liujw_qsplit_maxcut_which_child(node, query_join)
+            children = qsplit_maxcut_which_child(node, query_join)
             result.append([])
             for i in children:
                 result[-1].append(len(q))
@@ -78,7 +78,7 @@ def get_fjbuckets_bfs(query, join_scope: list, subroot, attr, this_table_domain:
                 assert not 'has implemented'
     return result[0]
 
-def gen_ce_tree_liujw_pbfs(query, root, attr, this_table_domain: list):
+def gen_ce_tree_pbfs(query, root, attr, this_table_domain: list):
     #bfs with prune
     q = []
     f = -1
@@ -89,7 +89,7 @@ def gen_ce_tree_liujw_pbfs(query, root, attr, this_table_domain: list):
         node = q[f]
         if isinstance(node, Leaf):
             #print(node.query(query, attr))
-            result.append((node.query(query, attr), leaf_select_FJBuckets_opt(node.scope, node.factor_join_buckets, query, this_table_domain)))
+            result.append((node.query(query, attr), leaf_select_FJBuckets_opt(node.scope, node.join_buckets, query, this_table_domain)))
             #print()
             #exit(-1)
         elif isinstance(node, Product):
@@ -109,7 +109,7 @@ def gen_ce_tree_liujw_pbfs(query, root, attr, this_table_domain: list):
                 if not scope_intersect:
                     result[-1].append(None)
         elif isinstance(node, QSum):
-            children = liujw_qsplit_maxcut_which_child(node, query)
+            children = qsplit_maxcut_which_child(node, query)
             result.append([])
             for i in children:
                 result[-1].append(len(q))
@@ -131,7 +131,7 @@ def gen_ce_tree_liujw_pbfs(query, root, attr, this_table_domain: list):
     #exit(-1)
     return q, result
 
-def join_probability_execute_ce_tree_liujw_pbfs(query, join_scope: list, this_table_domain: list, q_node: list, q_edge: list, attr):
+def join_probability_execute_ce_tree_pbfs(query, join_scope: list, this_table_domain: list, q_node: list, q_edge: list, attr):
     #calc
     #print(q_node)
     #print(q_edge)
@@ -325,7 +325,7 @@ def mqspn_probability(mqspn: MultiQSPN, query: dict, attr=(None,)):
         #     query_attr = attr
         #print(query_attr)
         #exit(-1)
-        joined_tables_qspn_ce_tree[i] = gen_ce_tree_liujw_pbfs(joined_tables_query_select[i], mqspn.table_qspn_model[i], query_attr, mqspn.table_domain[i])
+        joined_tables_qspn_ce_tree[i] = gen_ce_tree_pbfs(joined_tables_query_select[i], mqspn.table_qspn_model[i], query_attr, mqspn.table_domain[i])
     if DETAIL_PERF:
         perf_qspn_prune = (perf_counter() - perf_qspn_prune) * 1000
     #get_join_TablesColumns_groups
@@ -354,7 +354,7 @@ def mqspn_probability(mqspn: MultiQSPN, query: dict, attr=(None,)):
             perf_merge_buckets = perf_counter()
         for j in group_join_tables_scope:
             #print(j)
-            exec_ce_tree_j = join_probability_execute_ce_tree_liujw_pbfs(joined_tables_query_select[j], group_join_tables_scope[j], mqspn.table_domain[j], joined_tables_qspn_ce_tree[j][0], joined_tables_qspn_ce_tree[j][1], attr=None)
+            exec_ce_tree_j = join_probability_execute_ce_tree_pbfs(joined_tables_query_select[j], group_join_tables_scope[j], mqspn.table_domain[j], joined_tables_qspn_ce_tree[j][0], joined_tables_qspn_ce_tree[j][1], attr=None)
             #print(j, exec_ce_tree_j[0])
             # if j == 'cast_info':
             #      exec_ce_tree_j[1]._print(no_zero=True)

@@ -3,7 +3,7 @@ import time
 import logging
 import xgboost as xgb
 from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, get_nodes_by_type,\
-    get_topological_order, get_parents, liujw_qspn_get_topological_order, liujw_qsplit_maxcut_which_child
+    get_topological_order, get_parents, qspn_get_topological_order, qsplit_maxcut_which_child
 from Structure.StatisticalTypes import MetaType
 from Structure.leaves.fspn_leaves.Merge_leaves import Merge_leaves
 from Learning.validity import is_valid
@@ -238,7 +238,7 @@ class FSPN:
         X = np.array(X)
         return node.qdcorr.predict(X)[0]
     
-    def _probability_liujw_pbfs(self, query, root, attr):
+    def _probability_pbfs(self, query, root, attr):
         #bfs
         q = []
         f = -1
@@ -266,7 +266,7 @@ class FSPN:
                     if not scope_intersect:
                         result[-1].append(None)
             elif isinstance(node, QSum):
-                children = liujw_qsplit_maxcut_which_child(node, query)
+                children = qsplit_maxcut_which_child(node, query)
                 result.append([])
                 for i in children:
                     result[-1].append(len(q))
@@ -312,7 +312,7 @@ class FSPN:
                     assert not 'has implemented'
         return result[0]
 
-    def _probability_liujw_dfs(self, query, node, attr):
+    def _probability_qspnfast_dfs(self, query, node, attr):
         if isinstance(node, Leaf):
             result = node.query(query, attr)
         elif isinstance(node, Product):
@@ -325,7 +325,7 @@ class FSPN:
                 scope_intersect = False
                 for j in i.scope:
                     if j in query_scope:
-                        tmp_children_list.append(self._probability_liujw_dfs(query, i, attr))
+                        tmp_children_list.append(self._probability_qspnfast_dfs(query, i, attr))
                         scope_intersect = True
                         break
                 if not scope_intersect:
@@ -333,16 +333,16 @@ class FSPN:
                 result = prod_likelihood(node, tmp_children_list)
         elif isinstance(node, QSum):
             tmp_children_list = []
-            children = liujw_qsplit_maxcut_which_child(node, query)
+            children = qsplit_maxcut_which_child(node, query)
             #print(children)
             for i in children:
-                tmp_children_list.append(self._probability_liujw_dfs(query, i, attr))
+                tmp_children_list.append(self._probability_qspnfast_dfs(query, i, attr))
             result = Qsum_likelihood(node, tmp_children_list)
         elif isinstance(node, Sum):
             tmp_children_list = []
             for i in node.children:
                 #pruning by data subset domain has NOT implemented
-                tmp_children_list.append(self._probability_liujw_dfs(query, i, attr))
+                tmp_children_list.append(self._probability_qspnfast_dfs(query, i, attr))
             result = sum_likelihood(node, tmp_children_list)
         else:
             assert not 'has implemented'
@@ -380,11 +380,11 @@ class FSPN:
         #pdb.set_trace()
         return all_results[node]
 
-    def _liujw_qspn_probability_left_most(self, query, node, attr):
+    def qspn_probability_left_most(self, query, node, attr):
         """
             calculate the probability on spn without factorized node
         """
-        nodes = liujw_qspn_get_topological_order(node, query)
+        nodes = qspn_get_topological_order(node, query)
 
         all_results = {}
 
@@ -506,16 +506,15 @@ class FSPN:
             #prob = self._probability_left_most(query, node, query_attr)
             if first_time_recur:
                 if PBFS_PROB:
-                    prob = self._probability_liujw_pbfs(query, node, query_attr)
+                    prob = self._probability_pbfs(query, node, query_attr)
                 elif DFS_PROB:
-                    prob = self._probability_liujw_dfs(query, node, query_attr)
+                    prob = self._probability_qspnfast_dfs(query, node, query_attr)
                 elif exist_qsum:
                     #print('query:', query)
-                    #print('_liujw_qspn_probability_left_most:')
                     #exit(-1)
                     #print(query)
                     #exit(-1)
-                    prob = self._liujw_qspn_probability_left_most(query, node, query_attr)
+                    prob = self.qspn_probability_left_most(query, node, query_attr)
             else:
                 prob = self._probability_left_most(query, node, query_attr)
             return prob

@@ -135,7 +135,6 @@ def workload_data_columns_stats(workload):
 #dc = data_columns_stats(workload)
 
 def multi_table_dataset_csv_reader(data_root: str, dc: dict):
-    #data_root = '/home/liujw/neurocard-master/neurocard/datasets/job'
     dataset = {}
     for i in dc:
         data_path = os.path.join(data_root, i + '.csv')

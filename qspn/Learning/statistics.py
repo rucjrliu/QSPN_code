@@ -8,7 +8,7 @@ import pdb
 
 logger = logging.getLogger(__name__)
 
-def liujw_print_spn_structure(root):
+def print_spn_structure(root):
     print('{}-rooted'.format(root))
     edges = print_spn_structure(root, Node)
     for i in edges:

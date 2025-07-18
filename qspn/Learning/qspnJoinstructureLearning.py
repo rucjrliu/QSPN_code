@@ -1126,7 +1126,7 @@ def learn_structure(
             #print('local_data_no_nan.shape:', local_data.shape)
             #nonnan_cardinality = len(local_data)
             if (cond_fanout_data is None or len(cond_fanout_data) == 0) and len(scope) == 1:
-                print('liujw: create_leaf(single)...')
+                print('create_leaf(single)...')
                 node = create_leaf(local_data, ds_context, scope, condition)
                 print('nan_perc =', node.nan_perc)
             elif create_leaf_fanout is None:
@@ -1146,8 +1146,6 @@ def learn_structure(
             node.cardinality = len(local_data)
             print(node.cardinality)
             #node.nonnan_cardinality = nonnan_cardinality
-            #add by liujw
-            #FactorJoin-QSPN
             if build_fjbuckets is not None and joined_scope is not None:
                 fjbuckets_scope = []
                 data_slice_fjbuckets_idx = np.zeros((local_data.shape[1],)).astype(bool)
@@ -1162,23 +1160,19 @@ def learn_structure(
                         print('Build FJBuckets on scope =', fjbuckets_scope, 'scidx =', data_slice_fjbuckets_idx)
                         #assert node.cardinality == node.nonnan_cardinality
                         #input('Press ENTER to continue...')
-                        node.factor_join_buckets = FJBuckets()
-                        node.factor_join_buckets.calc_from_data(local_data, fjbuckets_scope, data_slice_fjbuckets_idx, build_fjbuckets)
+                        node.join_buckets = FJBuckets()
+                        node.join_buckets.calc_from_data(local_data, fjbuckets_scope, data_slice_fjbuckets_idx, build_fjbuckets)
                     else:
                         print('Build FJBuckets on scope =', fjbuckets_scope, 'scidx =', data_slice_fjbuckets_idx, 'dsf:', [i.shape for i in local_joined_downscale_factor_cols])
                         #print('node.cardinality={}, node.nonnan_cardinality={}'.format(node.cardinality, node.nonnan_cardinality))
                         assert len(data_slice_fjbuckets_idx) == 1
                         #input('Press ENTER to continue...')
-                        node.factor_join_buckets = FJBuckets()
-                        node.factor_join_buckets.calc_from_data2(local_data, fjbuckets_scope, data_slice_fjbuckets_idx, build_fjbuckets, joined_tables_name, local_joined_downscale_factor_cols)
+                        node.join_buckets = FJBuckets()
+                        node.join_buckets.calc_from_data2(local_data, fjbuckets_scope, data_slice_fjbuckets_idx, build_fjbuckets, joined_tables_name, local_joined_downscale_factor_cols)
             leaf_end_t = perf_counter()
-            if node.factor_join_buckets is not None:
-                #print('FJBuckets scope =', node.factor_join_buckets.scope)
-                # for bkeys, bs in zip(node.factor_join_buckets.buckets_keys, node.factor_join_buckets.buckets):
-                #     print('bucket hash =', bkeys)
-                #     print('\tmcv={}\n\tmcv_freq={}\n\tdomain={}\n\tn={}'.format(bs.mcv, bs.mcv_freq, bs.domain, bs.n))
-                print('{} - {} buckets on scope:{}'.format(len(node.factor_join_buckets.buckets_keys), len(node.factor_join_buckets.buckets), node.factor_join_buckets.scope))
-                node.factor_join_buckets._print()
+            if node.join_buckets is not None:
+                print('{} - {} buckets on scope:{}'.format(len(node.join_buckets.buckets_keys), len(node.join_buckets.buckets), node.join_buckets.scope))
+                node.join_buckets._print()
                 #exit(-1)
             #input('Press ENTER to continue...')
 

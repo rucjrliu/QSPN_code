@@ -1068,7 +1068,7 @@ def learn_structure(
         elif operation == Operation.CREATE_LEAF:
             leaf_start_t = perf_counter()
             if (cond_fanout_data is None or len(cond_fanout_data) == 0) and len(scope) == 1:
-                print('liujw: create_leaf(single)...')
+                print('create_leaf(single)...')
                 node = create_leaf(local_data, ds_context, scope, condition)
             elif create_leaf_fanout is None:
                 node = create_leaf_multi(local_data, ds_context, scope, condition)
@@ -1085,11 +1085,9 @@ def learn_structure(
             node.range = rect_range
             parent.children[children_pos] = node
             node.cardinality = len(local_data)
-            #add by liujw
-            #FactorJoin-QSPN
             if build_fjbuckets is not None:
-                node.factor_join_buckets = FJBuckets()
-                node.factor_join_buckets.calc_from_data(local_data, scope, build_fjbuckets)
+                node.join_buckets = FJBuckets()
+                node.join_buckets.calc_from_data(local_data, scope, build_fjbuckets)
             leaf_end_t = perf_counter()
 
             logging.debug(

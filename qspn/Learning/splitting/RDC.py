@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 CCA_MAX_ITER = 100
 
-LIUJW_NO_OHE = True
+L_NO_OHE = True
 
 
 def ecdf(X):
@@ -116,7 +116,7 @@ def rdc_transformer(
         #print(ohe_data(local_data[:, f], domains[f]))
         #features.append(local_data[:, f].reshape(-1, 1))
         #continue
-        if not LIUJW_NO_OHE and meta_types[f] == MetaType.DISCRETE:
+        if not L_NO_OHE and meta_types[f] == MetaType.DISCRETE:
             features.append(ohe_data(local_data[:, f], domains[f]))
         else:
             features.append(local_data[:, f].reshape(-1, 1))

@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from copy import deepcopy
-from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, liujw_qsplit_maxcut_which_child
+from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, qsplit_maxcut_which_child
 from Structure.StatisticalTypes import MetaType
 from Structure.leaves.fspn_leaves.Merge_leaves import Merge_leaves
 from Learning.validity import is_valid
@@ -34,7 +34,7 @@ def get_fjbuckets_bfs2(query, join_scope: list, subroot, attr, this_table_domain
         f += 1
         #print(node)
         if isinstance(node, Leaf):
-            result.append(leaf_select_FJBuckets2(join_scope, node.factor_join_buckets, None, this_table_domain, joined_tables))
+            result.append(leaf_select_FJBuckets2(join_scope, node.join_buckets, None, this_table_domain, joined_tables))
         elif isinstance(node, Product):
             result.append([])
             for i in node.children:
@@ -50,7 +50,7 @@ def get_fjbuckets_bfs2(query, join_scope: list, subroot, attr, this_table_domain
             for i in join_scope:
                 query_join[0][0, i] = -1
                 query_join[1][0, i] = -1
-            children = liujw_qsplit_maxcut_which_child(node, query_join)
+            children = qsplit_maxcut_which_child(node, query_join)
             result.append([])
             for i in children:
                 result[-1].append(len(q))
@@ -90,7 +90,7 @@ def get_fjbuckets_bfs2(query, join_scope: list, subroot, attr, this_table_domain
     #print(result[0])
     return result[0]
 
-def gen_ce_tree_liujw_pbfs2(query, root, attr, this_table_domain: list, joined_tables: set):
+def gen_ce_tree_pbfs2(query, root, attr, this_table_domain: list, joined_tables: set):
     #print('FFFKKK')
     #exit(-1)
     #bfs with prune
@@ -103,7 +103,7 @@ def gen_ce_tree_liujw_pbfs2(query, root, attr, this_table_domain: list, joined_t
         node = q[f]
         if isinstance(node, Leaf):
             #print(node.query(query, attr))
-            result.append((node.query(query, attr), leaf_select_FJBuckets2(node.scope, node.factor_join_buckets, query, this_table_domain, joined_tables)))
+            result.append((node.query(query, attr), leaf_select_FJBuckets2(node.scope, node.join_buckets, query, this_table_domain, joined_tables)))
             #print()
             #exit(-1)
         elif isinstance(node, Product):
@@ -123,7 +123,7 @@ def gen_ce_tree_liujw_pbfs2(query, root, attr, this_table_domain: list, joined_t
                 if not scope_intersect:
                     result[-1].append(None)
         elif isinstance(node, QSum):
-            children = liujw_qsplit_maxcut_which_child(node, query)
+            children = qsplit_maxcut_which_child(node, query)
             result.append([])
             for i in children:
                 result[-1].append(len(q))
@@ -146,7 +146,7 @@ def gen_ce_tree_liujw_pbfs2(query, root, attr, this_table_domain: list, joined_t
     #exit(-1)
     return q, result
 
-def join_probability_execute_ce_tree_liujw_pbfs2(query, join_scope: list, this_table_domain: list, q_node: list, q_edge: list, attr, joined_tables: set):
+def join_probability_execute_ce_tree_pbfs2(query, join_scope: list, this_table_domain: list, q_node: list, q_edge: list, attr, joined_tables: set):
     #calc
     #print(q_node)
     #print(q_edge)
@@ -413,7 +413,7 @@ def mqspn_probability2(mqspn: MultiQSPN, query: dict, attr=None):
         #exit(-1)
         #print(mqspn.bigtable_qspn_model)
         #print(bigtable_joined_tables)
-        bigtables_qspn_ce_tree[i] = gen_ce_tree_liujw_pbfs2(bigtables_query_select[i], mqspn.bigtable_qspn_model[i], query_attr, mqspn.bigtable_domain[i], bigtable_joined_tables[i])
+        bigtables_qspn_ce_tree[i] = gen_ce_tree_pbfs2(bigtables_query_select[i], mqspn.bigtable_qspn_model[i], query_attr, mqspn.bigtable_domain[i], bigtable_joined_tables[i])
         #print(list(zip(bigtables_qspn_ce_tree[i][0], bigtables_qspn_ce_tree[i][1])))
         #print()
         #exit(-1)
@@ -432,7 +432,7 @@ def mqspn_probability2(mqspn: MultiQSPN, query: dict, attr=None):
         else:
             query_attr = attr
         #print('input:', bigtables_query_select[i], [mqspn.bigtable_columns[i]['__join_key__']], mqspn.bigtable_domain[i], cetree_i[0], cetree_i[1], attr, bigtable_joined_tables[i])
-        fjbuckets_l = join_probability_execute_ce_tree_liujw_pbfs2(bigtables_query_select[i], [mqspn.bigtable_columns[i]['__join_key__']], mqspn.bigtable_domain[i], cetree_i[0], cetree_i[1], attr, bigtable_joined_tables[i])[1]
+        fjbuckets_l = join_probability_execute_ce_tree_pbfs2(bigtables_query_select[i], [mqspn.bigtable_columns[i]['__join_key__']], mqspn.bigtable_domain[i], cetree_i[0], cetree_i[1], attr, bigtable_joined_tables[i])[1]
         #print(fjbuckets_l)
         #for j in fjbuckets_l:
         #    print(j)
@@ -461,54 +461,3 @@ def mqspn_probability2(mqspn: MultiQSPN, query: dict, attr=None):
     else:
         return int(round(ret))
 
-    # #get_join_TablesColumns_groups
-    # #print('gen tree OK')
-    # #exit(-1)
-    # group, join_parameters_nodes = get_join_TablesColumns_groups(mqspn, join_pairs)
-    # #print(group, join_parameters_nodes)
-    # #exit(-1)
-    # #ve
-    # ve_ret = []
-    # #print('ve and execute ce tree...')
-    # for i in group:
-    #     #execute ce_tree
-    #     group_join_tables_scope = {}
-    #     group_join_tables_fjbuckets = {}
-    #     for j in i:
-    #         for k in join_parameters_nodes[j]:
-    #             kt, kc = k.split('.')
-    #             if kt not in group_join_tables_scope:
-    #                 group_join_tables_scope[kt] = []
-    #             group_join_tables_scope[kt].append(mqspn.table_columns[kt][kc])
-    #     #print(group_join_tables_scope)
-    #     #exit(-1)
-
-    #     for j in group_join_tables_scope:
-    #         #print(j)
-    #         exec_ce_tree_j = join_probability_execute_ce_tree_liujw_pbfs2(joined_tables_query_select[j], group_join_tables_scope[j], mqspn.table_domain[j], joined_tables_qspn_ce_tree[j][0], joined_tables_qspn_ce_tree[j][1], attr)
-    #         #print(j, exec_ce_tree_j[0])
-    #         # if j == 'cast_info':
-    #         #      exec_ce_tree_j[1]._print(no_zero=True)
-    #         group_join_tables_fjbuckets[j] = exec_ce_tree_j[1]
-    #     if DETAIL_PERF:
-    #         perf_merge_buckets = (perf_counter() - perf_merge_buckets) * 1000
-    #     #print('execute tree OK')
-    #     # for j in group_join_tables_scope:
-    #     #     print(j)
-    #     #     group_join_tables_fjbuckets[j]._print()
-    #     #exit(-1)
-    #     if DETAIL_PERF:
-    #         perf_pre_ve = perf_counter()
-    #     group_domain_fjbuckets, group_others, group_others_buckets_scope_mapping = calc_domain_fjbuckets(group_join_tables_fjbuckets, i, join_parameters_nodes, mqspn)
-    #     if DETAIL_PERF:
-    #         perf_pre_ve = (perf_counter() - perf_pre_ve) * 1000
-    #         perf_ve = perf_counter()
-    #     ve_ret.append(ve(group_domain_fjbuckets, group_others, group_others_buckets_scope_mapping))
-    #     if DETAIL_PERF:
-    #         perf_ve = (perf_counter() - perf_ve) * 1000
-    # #print('ve OK')
-    # #print(int(np.prod(ve_ret)))
-    # if DETAIL_PERF:
-    #     return int(round(np.prod(ve_ret))), perf_qspn_prune, perf_merge_buckets, perf_pre_ve, perf_ve
-    # else:
-    #     return int(round(np.prod(ve_ret)))
