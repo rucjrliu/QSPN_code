@@ -57,11 +57,11 @@ where '--skew 0.0' and '--corr 0.0' means using the model constructed on the ori
 
 If you want to test update method *AdaIncr* on Data-Update-Only workload, the command is
 
-    python scripts/run_qspn.py --dataset forest10 --skew 0.0 --corr 0.0 --update-method notrain --update-query-root update --update-skew 0.0 --update-corr 0.0
+    python scripts/run_qspn.py --dataset forest10 --skew 0.0 --corr 0.0 --update-method adaincr --update-query-root update --update-skew 0.0 --update-corr 0.0
 
 If you want to test update method *AdaIncr* on Query-Update-Only workload, the command is
 
-    python scripts/run_qspn.py --dataset forest10 --skew 0.0 --corr 0.0 --update-method notrain --update-query-root template --update-skew 0.5 --update-corr 0.5
+    python scripts/run_qspn.py --dataset forest10 --skew 0.0 --corr 0.0 --update-method adaincr --update-query-root template --update-skew 0.5 --update-corr 0.5
 
 You can also change the dataset by change parameter '--dataset forest10' to '--dataset gas/census13/power7' and so on.
 

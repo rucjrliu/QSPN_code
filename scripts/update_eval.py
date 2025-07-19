@@ -297,24 +297,24 @@ def update_1by1(run_qspn_func, update_qspn_func, args, cluster, model_save, MODE
         seq_time = 0
         seq_q_errs = []
         interval_sql_num = 0
-    print('Total Time = {} min'.format(total_time / 60))
-    errors = np.maximum(np.divide(est_card, true_card), np.divide(true_card, est_card))
-    print()
-    print("Q-Error:")
-    print(list(errors))
-    print("Q-Error distributions are:")
-    for n in [50, 90, 95, 99, 100]:
-        print(f"{n}% percentile:", np.percentile(errors, n))
-    print('Mean: {}'.format(np.mean(errors)))
-    print('smooth Mean (NoMAX): {}'.format((sum(errors) - np.percentile(errors, 100)) / (len(errors)-1)))
-    with open('qspn_update_expr.log', 'a') as dumplog:
-        dumplog.write('Total Time = {} min\n'.format(total_time / 60))
-        dumplog.write('Q-Error:\n')
-        dumplog.write('[{}]\n'.format(','.join(list(map(str, list(errors))))))
-        dumplog.write("Q-Error distributions are:\n")
-        for n in [50, 90, 95, 99, 100]:
-            dumplog.write("{}% percentile:{}\n".format(n, np.percentile(errors, n)))
-        dumplog.write('Mean: {}\n'.format(np.mean(errors)))
+    # print('Total Time = {} min'.format(total_time / 60))
+    # errors = np.maximum(np.divide(est_card, true_card), np.divide(true_card, est_card))
+    # print()
+    # print("Q-Error:")
+    # print(list(errors))
+    # print("Q-Error distributions are:")
+    # for n in [50, 90, 95, 99, 100]:
+    #     print(f"{n}% percentile:", np.percentile(errors, n))
+    # print('Mean: {}'.format(np.mean(errors)))
+    # print('smooth Mean (NoMAX): {}'.format((sum(errors) - np.percentile(errors, 100)) / (len(errors)-1)))
+    # with open('qspn_update_expr.log', 'a') as dumplog:
+    #     dumplog.write('Total Time = {} min\n'.format(total_time / 60))
+    #     dumplog.write('Q-Error:\n')
+    #     dumplog.write('[{}]\n'.format(','.join(list(map(str, list(errors))))))
+    #     dumplog.write("Q-Error distributions are:\n")
+    #     for n in [50, 90, 95, 99, 100]:
+    #         dumplog.write("{}% percentile:{}\n".format(n, np.percentile(errors, n)))
+    #     dumplog.write('Mean: {}\n'.format(np.mean(errors)))
     pickle.dump(qspn, open('update_eval_tmp.pkl', "wb"), pickle.HIGHEST_PROTOCOL)
     upded_model_size = os.path.getsize('update_eval_tmp.pkl')
     print(f"Updated Model Size: {upded_model_size/1000} KB")
