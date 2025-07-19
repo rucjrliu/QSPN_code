@@ -15,7 +15,7 @@ This is the code of our *QSPN/M-QSPN* model, corresponding to the paper: A Unifi
 
 **Step 3:** Downloading our experimental data.
 
-Download file **qspn_data_models.tar** from OneDrive sharing link:  and then decompress it:
+Download file **qspn_data_models.tar** from OneDrive sharing link: https://1drv.ms/u/c/f9c0a1a8c6911768/EZhXKSN0fgVBizPkvw0Eeu0BNVAjk5OxrwoVerEp_ojylg?e=cErDPM and then decompress it:
 
     tar -xf qspn_data_models.tar
 
