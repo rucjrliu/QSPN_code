@@ -27,10 +27,9 @@ There will be two new directories in *'QSPN_code/'*: *'data/'* and *'models/'* w
 
 We first show the commands of conducting the experiments in our paper.
 
-Dataset: GAS/Census/Forest/Power
+Dataset: GAS/Forest/Power
 
     python scripts/run_qspn.py --dataset gas --inference
-    python scripts/run_qspn.py --dataset census13 --inference
     python scripts/run_qspn.py --dataset forest10 --inference
     python scripts/run_qspn.py --dataset power7 --inference
 
@@ -39,11 +38,10 @@ The result will be outputed to the console, including Model Size, Mean Inference
 You can also construct *QSPN* models by yourself, like
 
     python scripts/run_qspn.py --dataset gas --train
-    python scripts/run_qspn.py --dataset census13 --train
     python scripts/run_qspn.py --dataset forest10 --train
     python scripts/run_qspn.py --dataset power7 --train
 
-The Model Construction Time and Model Size will be outputed to the console. And the *QSPN* model file: *'models/single_tables/qspn/qspn_5.0_0.1_0.3_QSplit_\{gas/census13/forest10/power7\}_template_0.5_0.5.pkl'* will be overwritten by the new constructed *QSPN* model.
+The Model Construction Time and Model Size will be outputed to the console. And the *QSPN* model file: *'models/single_tables/qspn/qspn_5.0_0.1_0.3_QSplit_\{gas/forest10/power7\}_template_0.5_0.5.pkl'* will be overwritten by the new constructed *QSPN* model.
 
 ### QSPN Update CardEst
 
@@ -63,7 +61,7 @@ If you want to test update method *AdaIncr* on Query-Update-Only workload, the c
 
     python scripts/run_qspn.py --dataset forest10 --skew 0.0 --corr 0.0 --update-method adaincr --update-query-root template --update-skew 0.5 --update-corr 0.5
 
-You can also change the dataset by change parameter '--dataset forest10' to '--dataset gas/census13/power7' and so on.
+You can also change the dataset by change parameter '--dataset forest10' to '--dataset gas/power7' and so on.
 
 The result will be outputed to file *'qspn_update_expr.log'*, including workload executing time and Mean Q-error on each interval of the whole update workload (we set $10$ checkpoints).
 
