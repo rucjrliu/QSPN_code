@@ -55,12 +55,61 @@ def sum_log_likelihood(node, children, dtype=np.float64, **kwargs):
 def sum_prune_by_datadomain(node, childi, query):
     cover = True
     for i, (l, r) in enumerate(zip(node.node_error[1]['data_min'][childi], node.node_error[1]['data_max'][childi])):
-        if query[0][0, node.scope[i]] > r or query[1][0, node.scope[i]] < l:
+        ql, qr = query[0][0, node.scope[i]], query[1][0, node.scope[i]]
+        if ql > r or qr < l:
             return np.array([0.0])
-        elif not (query[0][0, node.scope[i]] <= l and query[1][0, node.scope[i]] >= r):
+        elif cover and (ql > l or qr < r):
             cover = False
-            break
+            #break
     if cover:
+        return np.array([1.0])
+    else:
+        return None
+
+# def sum_prune_by_datadomain_opt(node, childi, query):
+#     node_childi_ls = np.array(node.node_error[1]['data_min'][childi])
+#     node_childi_rs = np.array(node.node_error[1]['data_max'][childi])
+#     no_intersect = (query[0][0, node.scope] > node_childi_rs) | (query[1][0, node.scope] < node_childi_ls)
+#     cover = (query[0][0, node.scope] <= node_childi_ls) & (query[1][0, node.scope] >= node_childi_rs)
+#     if no_intersect.all():
+#         return np.array([0.0])
+#     elif cover.all():
+#         return np.array([1.0])
+#     else:
+#         return None
+
+# def sum_prune_by_datadomain_nasupport_opt(node, childi, query):
+#     node_childi_ls = np.array(node.node_error[1]['data_min'][childi])
+#     node_childi_rs = np.array(node.node_error[1]['data_max'][childi])
+#     no_intersect = (query[0][0, node.scope] > node_childi_rs) | (query[1][0, node.scope] < node_childi_ls)
+#     no_filtering = (query[0][0, node.scope] == -np.inf) & (query[1][0, node.scope] == np.inf)
+#     if no_intersect.all():
+#         return np.array([0.0])
+#     elif no_filtering.all():
+#         return np.array([1.0])
+#     else:
+#         return None
+
+# def sum_prune_by_datadomain_nasupport(node, childi, query):
+#     for i, (l, r) in enumerate(zip(node.node_error[1]['data_min'][childi], node.node_error[1]['data_max'][childi])):
+#         if query[0][0, node.scope[i]] > r or query[1][0, node.scope[i]] < l:
+#             return np.array([0.0])
+#     return None
+
+def sum_prune_by_datadomain_nasupport(node, childi, query):
+    no_filtering = True
+    for i, (l, r) in enumerate(zip(node.node_error[1]['data_min'][childi], node.node_error[1]['data_max'][childi])):
+        # if query[0][0, node.scope[i]] > r or query[1][0, node.scope[i]] < l:
+        #     return np.array([0.0])
+        # elif no_filtering and (query[0][0, node.scope[i]] != -np.inf or query[1][0, node.scope[i]] != np.inf):
+        #     no_filtering = False
+        #     #break
+        ql, qr = query[0][0, node.scope[i]], query[1][0, node.scope[i]]
+        if ql != -np.inf or qr != np.inf:
+            no_filtering = False
+            if not (ql <= r and qr >= l):
+                return np.array([0.0])
+    if no_filtering:
         return np.array([1.0])
     else:
         return None

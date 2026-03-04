@@ -102,7 +102,9 @@ def create_histogram_leaf(data, ds_context, scope, condition, alpha=1.0, hist_so
     domain = ds_context.domains[idx]
     #print(f'domain:{domain}')
 
-    assert not np.isclose(np.max(domain), np.min(domain)), "invalid domain, min and max are the same"
+    #assert not np.isclose(np.max(domain), np.min(domain)), "invalid domain, min and max are the same"
+    if np.max(domain) == np.min(domain):
+        domain[-1] = np.max(domain) + 1e-5
     #print(data.shape[0], np.var(data))
     #exit(-1)
 

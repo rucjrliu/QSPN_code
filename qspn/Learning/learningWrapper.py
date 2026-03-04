@@ -89,7 +89,8 @@ def learn_FSPN(
     updateQSPN_scope=None,
     updateQSPN_workload_all_n=None,
     qdcorr=None,
-    build_fjbuckets=None
+    build_fjbuckets=None,
+    amis=None
 ):
     if leaves is None:
         leaves = create_histogram_leaf
@@ -114,7 +115,7 @@ def learn_FSPN(
                                   rdc_strong_connection_threshold=rdc_strong_connection_threshold,
                                   wkld_attr_threshold=wkld_attr_threshold,
                                   wkld_attr_bound=wkld_attr_bound,
-                                  multivariate_leaf=multivariate_leaf, updateQSPN_scope=updateQSPN_scope, updateQSPN_workload_all_n=updateQSPN_workload_all_n, qdcorr=qdcorr, build_fjbuckets=build_fjbuckets)
+                                  multivariate_leaf=multivariate_leaf, updateQSPN_scope=updateQSPN_scope, updateQSPN_workload_all_n=updateQSPN_workload_all_n, qdcorr=qdcorr, build_fjbuckets=build_fjbuckets, amis=amis)
 
     if memory:
         learn_param = memory.cache(learn_param)

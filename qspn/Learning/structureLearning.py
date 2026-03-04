@@ -90,10 +90,11 @@ class Operation(Enum):
     FACTORIZE_CONDITION = 10  # NOT IMPLEMENTED Factorize columns when there is condition
 
     SPLIT_QUERIES = 11 # A QSUM node
+    SPLIT_NAN_COLUMNS = 12 #split all-nan column 
 
 
 def get_next_operation(ds_context, min_instances_slice=100, min_features_slice=1, multivariate_leaf=True, split_queries=None,
-                       threshold=0.3, rdc_sample_size=50000, rdc_strong_connection_threshold=0.75, wkld_attr_threshold=0.01, wkld_attr_bound=(0.2, 0.5)):
+                       threshold=0.3, rdc_sample_size=50000, rdc_strong_connection_threshold=0.75, wkld_attr_threshold=0.01, wkld_attr_bound=(0.2, 0.5), amis=None):
     """
     :param ds_context: A context specifying the type of the variables in the dataset
     :param min_instances_slice: minimum number of rows to stop splitting by rows
@@ -117,7 +118,8 @@ def get_next_operation(ds_context, min_instances_slice=100, min_features_slice=1
             rdc_threshold=threshold,
             rdc_strong_connection_threshold=rdc_strong_connection_threshold,
             wkld_attr_threshold=wkld_attr_threshold,
-            wkld_attr_bound=wkld_attr_bound
+            wkld_attr_bound=wkld_attr_bound,
+            amis=amis
     ):
         """
         :param data: local data set
@@ -146,8 +148,15 @@ def get_next_operation(ds_context, min_instances_slice=100, min_features_slice=1
             k = np.log(u-b)
             print(f"Nx: {Nx}, l:{l}, u:{u}")
 
+        print('min_instances_slice', min_instances_slice)
+        actual_min_instances_slice = min_instances_slice
+        if amis is not None:
+            actual_min_instances_slice = max(amis, min_instances_slice)
+        print('actual_min_instances_slice', actual_min_instances_slice)
+        # exit(-1)
+        #assert False
         minimalFeatures = len(scope) == min_features_slice
-        minimalInstances = data.shape[0] <= min_instances_slice
+        minimalInstances = data.shape[0] <= actual_min_instances_slice
 
         if minimalFeatures and len(condition) == 0:
             return Operation.CREATE_LEAF, None
@@ -157,7 +166,7 @@ def get_next_operation(ds_context, min_instances_slice=100, min_features_slice=1
             # the case of strongly connected components, directly model them
             #print('EEEEEEEEEEERRRRRRRRRR')
             return Operation.CREATE_LEAF, None
-
+        
         if (minimalInstances and len(condition) == 0) or (no_clusters and len(condition) <= 1):
             #print('RRRRRRRRRRREEEEEEEEEE')
             if (multivariate_leaf or is_strong_connected):
@@ -354,6 +363,17 @@ def get_next_operation(ds_context, min_instances_slice=100, min_features_slice=1
             else:
                 return Operation.NAIVE_FACTORIZATION, None
 
+        if data.dtype == np.float64:
+            data_check_column_all_nan = np.array([np.isnan(data[:, i]).all() for i in range(data.shape[1])])
+            if data_check_column_all_nan.any():
+                indep_res = np.zeros(data.shape[1])
+                num_connected_comp  = 0
+                for ith, i in enumerate(data_check_column_all_nan):
+                    if i:
+                        num_connected_comp += 1
+                        indep_res[ith] = num_connected_comp
+                return Operation.SPLIT_NAN_COLUMNS, indep_res
+
         # if none of the above conditions follows, we split by row or query and try again.
         if len(condition) == 0:
             if split_queries is not None and workload is not None and len(workload) > 1:
@@ -439,7 +459,8 @@ def learn_structure(
         updateQSPN_workload_all_n=None,
         qdcorr=None,
         build_fjbuckets=None,
-        workload_join=None
+        workload_join=None,
+        amis=None
 ):
     assert dataset is not None
     assert ds_context is not None
@@ -459,7 +480,7 @@ def learn_structure(
                                             wkld_attr_threshold=wkld_attr_threshold,
                                             wkld_attr_bound=wkld_attr_bound,
                                             multivariate_leaf=multivariate_leaf,
-                                            split_queries=split_queries)
+                                            split_queries=split_queries,amis=amis)
     
     num_queries = len(workload) if workload is not None else None
     if updateQSPN_workload_all_n is not None:
@@ -524,8 +545,73 @@ def learn_structure(
         if debug:
             logging.debug("OP: {} on data slice {}, workload slice {} (remaining tasks {})".format(operation, local_data.shape, wshape, len(tasks)))
         print("OP: {} on data slice {}, workload slice {} (remaining tasks {})".format(operation, local_data.shape, wshape, len(tasks)))
+        # if local_data.dtype == np.float64:
+        #     assert local_data.shape[0] > 50 or operation in [Operation.CREATE_LEAF, Operation.NAIVE_FACTORIZATION], 'operation should be CREATE_LEAF or NAIVE_FACTORIZATION'
 
-        if operation == Operation.REMOVE_UNINFORMATIVE_FEATURES:
+        if operation == Operation.SPLIT_NAN_COLUMNS:
+            indep_res = op_params
+            print('SPLIT_NAN_COLUMNS by {}'.format(indep_res))
+            print(local_data)
+            assert (indep_res != 0).any(), 'No all-nan columns?'
+            split_start_t = perf_counter()
+            #print(local_data)
+            #exit(-1)
+            data_slices = split_cols(local_data, ds_context, scope, clusters=indep_res)
+            split_end_t = perf_counter()
+
+            if debug:
+                logging.debug(
+                    "\t\tfound {} col clusters (in {:.5f} secs)".format(len(data_slices), split_end_t - split_start_t)
+                )
+            print("\t\tfound {} col clusters (in {:.5f} secs)".format(len(data_slices), split_end_t - split_start_t))
+
+            if len(data_slices) == 1:
+                tasks.append((local_data, local_workload, parent, children_pos, scope, condition, cond_fanout_data,
+                              rect_range, False, True, False, is_strong_connected, right_most_branch))
+                assert np.shape(data_slices[0][0]) == np.shape(local_data)
+                assert data_slices[0][1] == scope
+                continue
+
+            node = Product()
+            node.scope = copy.deepcopy(scope)
+            node.condition = copy.deepcopy(condition)
+            node.range = copy.deepcopy(rect_range)
+            node.typ = 'D'
+            print(node.scope)
+            #if node.node_error[0]['typ'] == 'Q':
+            #    exit(-1)
+            parent.children[children_pos] = node
+            #print(local_workload.shape)
+            #print('slices:')
+
+            for data_slice, scope_slice, _ in data_slices:
+                print('slice', scope_slice, data_slice.shape)
+                #print(data_slice)
+                assert isinstance(scope_slice, list), "slice must be a list"
+                assert (len(scope_slice) + len(condition)) == data_slice.shape[1], "Redundant data columns"
+                node.children.append(None)
+                if debug:
+                    logging.debug(
+                        f'Create an independent component with scope {scope_slice} and condition {condition}'
+                    )
+                if local_workload is not None:
+                    workload_slice = get_workload_by_scope(scope_slice, local_workload)
+                else:
+                    workload_slice = None
+                #print(workload_slice.shape)
+                tasks.append((data_slice, workload_slice, node, len(node.children) - 1, scope_slice, condition,
+                              cond_fanout_data, rect_range, False, True, False,
+                              is_strong_connected, right_most_branch))
+            #if node.scope[0] != 0 and local_workload.shape[0] > 0:
+            #exit(-1)
+            assert len(set(parent.condition).intersection(set(parent.scope))) == 0, \
+                "node %s has same attribute in both condition and range"
+            #if node.scope == [4,5,6,7] and node.typ == 'Q':
+            #    exit(-1)
+            #exit(-1)
+            continue
+
+        elif operation == Operation.REMOVE_UNINFORMATIVE_FEATURES:
             # Very messy because of the realignment from scope domain, condition domain and data column domain.
             (scope_rm, scope_rm2, scope_keep, condition_rm, condition_keep) = op_params
             new_condition = [condition[i] for i in condition_keep]
@@ -745,16 +831,23 @@ def learn_structure(
             node.node_error[1]['data_min'] = []
             for data_slice, scope_slice, proportion, center in data_slices:
                 print(len(data_slice), scope_slice, proportion, center)
-                node.node_error[0]['centers'].append(center)
-                _, vqerr = vq.vq(data_slice, np.array([center]))
-                node.node_error[0]['cluster_err'] += proportion * np.mean(vqerr)
+                if data_slice.dtype != np.float64:
+                    node.node_error[0]['centers'].append(center)
+                    _, vqerr = vq.vq(data_slice, np.array([center]))
+                    node.node_error[0]['cluster_err'] += proportion * np.mean(vqerr)
                 assert isinstance(scope_slice, list), "slice must be a list"
                 assert (len(scope) + len(condition)) == data_slice.shape[1], "Redundant data columns"
                 node.children.append(None)
                 node.weights.append(proportion)
                 node.cluster_centers.append(center)
-                node.node_error[1]['data_max'].append(np.max(data_slice, axis=0))
-                node.node_error[1]['data_min'].append(np.min(data_slice, axis=0))
+                data_slice_max = np.nanmax(data_slice, axis=0)
+                data_slice_min = np.nanmin(data_slice, axis=0)
+                node.node_error[1]['data_max'].append(data_slice_max)
+                node.node_error[1]['data_min'].append(data_slice_min)
+                if data_slice.dtype == np.float64:
+                    if 'nan_max_min' not in node.node_error[1]:
+                        node.node_error[1]['nan_max_min'] = []
+                    node.node_error[1]['nan_max_min'].append(np.any(np.isnan(data_slice_max)) | np.any(np.isnan(data_slice_min)))
                 if local_workload is not None:
                     workload_slice = get_workload_by_data(data_slice, scope_slice, local_workload)
                 else:
@@ -833,6 +926,7 @@ def learn_structure(
             print(op_params[2])
             #print(local_data)
             #exit(-1)
+            print(op_params[0])
             data_slices = split_cols(local_data, ds_context, scope, clusters=op_params[0])
             split_end_t = perf_counter()
 

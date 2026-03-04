@@ -15,7 +15,7 @@ This is the code of our *QSPN/M-QSPN* model, corresponding to the paper: A Unifi
 
 **Step 3:** Downloading our experimental data.
 
-Download file **qspn_data_models.tar** from OneDrive sharing link: https://1drv.ms/u/c/f9c0a1a8c6911768/EZhXKSN0fgVBizPkvw0Eeu0BNVAjk5OxrwoVerEp_ojylg?e=cErDPM and then decompress it:
+Download file **qspn_data_models.tar** from OneDrive sharing link: https://1drv.ms/u/c/f9c0a1a8c6911768/IQBf-quTIhx5S7WPpPzAeq1oAcU-jM1REgqdfJWdoWjvKHA?e=i1Zp6X and then decompress it:
 
     tar -xf qspn_data_models.tar
 
@@ -73,15 +73,19 @@ Dataset: IMDB, Workload: JOB-light
 
     python scripts/run_mqspn.py --dataset job --workload-trainset mscn_queries_neurocard_format --workload-testset job-light --inference
 
+Dataset: STATS, Workload: STATS-CEB
+
+    python scripts/run_mqspn.py --dataset stats --workload-trainset stats_CEB_trainset --workload-testset stats_CEB_testset --inference
+
 The result will be outputed to the console, including Model Size, Mean Inference Time, Q-error of each query, 50th/90th/95th/99th/Max/Mean Q-error of CardEst on the workload.
 
-If you want construction a *M-QSPN* model by yourself, such as a model with binning size as $1000$, the command is
+If you want construction a *M-QSPN* model by yourself, such as a model on STATS-CEB with *width* as $80000$, the command is
 
-    python scripts/run_mqspn.py --dataset job --workload-trainset mscn_queries_neurocard_format --workload-testset job-light --model-binning-size 1000 --train
+    python scripts/run_mqspn.py --dataset stats --workload-trainset stats_CEB_trainset --partition-width-limit 80000 --train
 
-Also, if you want to test this model (with not default binning size: $1000$), the command is
+Also, if you want to test this model (with not default *size*: $80000$), the command is
 
-    python scripts/run_mqspn.py --dataset job --workload-trainset mscn_queries_neurocard_format --workload-testset job-light --model-binning-size 1000 --inference
+    python scripts/run_mqspn.py --dataset stats --workload-trainset stats_CEB_trainset --workload-testset stats_CEB_testset --partition-width-limit 80000 --inference
 
 ## Code Structure
 
@@ -177,7 +181,7 @@ If you want to construct a *QSPN* model, add a switch parameter **--train**, the
 
 **--workload-testset**: set the name of multi-table workload test set like '--workload-testset userc'
 
-**--model-binning-size**: tune the bins size limit of *M-QSPN* model binning like '--model-binning-size 200'. A bigger setting usually improves the CardEst accuracy of *M-QSPN* model with longer inference time.
+**--partition-width-limit**: tune the join key binning size limit of *M-QSPN* model binning like '--partition-width-limit 60000'. A smaller setting usually improves the CardEst accuracy of *M-QSPN* model with longer inference time.
 
 If you want to construct a *M-QSPN* model, add a switch parameter **--train**, the model file will be dumped to the file like *'models/multi_tables/mqspn/mqspn_multbdat_userb_200.pkl'*. Correspondingly, if you want to test this constructed model, add a switch parameter **--inference**. Note that our code actually shows that we do not use workload test set for model construction and we only use the name of workload train set to locate the path of model file for model test though 'scripts/run_mqspn.py' always needs setting both '--workload-trainset' and '--workload-testset'.
 

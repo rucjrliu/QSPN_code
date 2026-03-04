@@ -3,18 +3,26 @@ import time
 import logging
 import xgboost as xgb
 from Structure.nodes import Context, Sum, Product, Factorize, Leaf, QSum, get_nodes_by_type,\
-    get_topological_order, get_parents, qspn_get_topological_order, qsplit_maxcut_which_child
+    get_topological_order, get_parents, qspn_get_topological_order, qsplit_maxcut_which_child, qsplit_maxcut_which_child_opt
 from Structure.StatisticalTypes import MetaType
 from Structure.leaves.fspn_leaves.Merge_leaves import Merge_leaves
 from Learning.validity import is_valid
 from Learning.learningWrapper import learn_FSPN
-from Inference.inference import prod_likelihood, sum_likelihood, prod_log_likelihood, sum_log_likelihood, Qsum_likelihood, qsum_likelihood, sum_prune_by_datadomain
+from Inference.inference import prod_likelihood, sum_likelihood, prod_log_likelihood, sum_log_likelihood, Qsum_likelihood, qsum_likelihood, sum_prune_by_datadomain, sum_prune_by_datadomain_nasupport
 import time
+from queue import deque
 
 import pdb
 
 DFS_PROB = False
 PBFS_PROB = True
+POS_INF = np.inf
+NEG_INF = -POS_INF
+CONST_ONE = np.array([1.0])
+NODE_LEAF = 0
+NODE_PRODUCT = 1
+NODE_QSUM = 2
+NODE_SUM = 3
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +320,452 @@ class FSPN:
                     assert not 'has implemented'
         return result[0]
 
+    def _probability_pbfs_opt(self, query, root, attr):
+        POS_INF = np.inf
+        NEG_INF = -POS_INF
+        CONST_ONE = np.array([1.0])
+        #print('_probability_pbfs_opt')
+        # query_scope = set()
+        # # for i in range(query[0].shape[1]):
+        # #     if query[0][0, i] != float('-inf') or query[1][0, i] != float('inf'):
+        # #         query_scope.add(i)
+        # for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])):
+        #     if l != -np.inf or r != np.inf:
+        #         query_scope.add(ith)
+        query_scope = set(ith for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])) if l != NEG_INF or r != POS_INF)
+        #print(np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0])
+        # query_scope = np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0]
+        #bfs
+        q = []
+        f = -1
+        q.append(root)
+        result = []
+        calc_node_type = []
+        NODE_LEAF = 0
+        NODE_PRODUCT = 1
+        NODE_QSUM = 2
+        NODE_SUM = 3
+        while len(q) > f + 1:
+            f += 1
+            node = q[f]
+            if isinstance(node, Leaf):
+                calc_node_type.append(NODE_LEAF)
+                result.append(node.query(query, attr))
+            elif isinstance(node, Product):
+                calc_node_type.append(NODE_PRODUCT)
+                # query_col_access = (query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf)
+                # result.append([])
+                # for i in node.children:
+                #     if query_col_access[i.scope].any():
+                #         result[-1].append(len(q))
+                #         q.append(i)
+                #     else:
+                #         result[-1].append(None)
+                result_f = []
+                for i in node.children:
+                    # scope_intersect = False
+                    # for j in i.scope:
+                    #     if j in query_scope:
+                    #         result[-1].append(len(q))
+                    #         q.append(i)
+                    #         scope_intersect = True
+                    #         break
+                    #scope_intersect = (len(query_scope.intersection(i.scope)) > 0)
+                    #scope_intersect = np.isin(i.scope, query_scope).any()
+                    if query_scope.isdisjoint(i.scope):
+                        result_f.append(None)
+                    else:
+                        result_f.append(len(q))
+                        q.append(i)
+                result.append(result_f)
+            elif isinstance(node, QSum):
+                calc_node_type.append(NODE_QSUM)
+                # children = qsplit_maxcut_which_child(node, query)
+                # result.append([])
+                # for i in children:
+                #     result[-1].append(len(q))
+                #     q.append(i)
+                child = qsplit_maxcut_which_child_opt(node, query)
+                result.append(len(q))
+                q.append(child)
+            elif isinstance(node, Sum):
+                calc_node_type.append(NODE_SUM)
+                result_f = []
+                #print(node.scope)
+                #print(node.node_error[1]['data_max'])
+                #print(node.node_error[1]['data_min'])
+                #print(query)
+                #exit(-1)
+                for i, c in enumerate(node.children):
+                    res_childi = sum_prune_by_datadomain(node, i, query)
+                    if res_childi is None:
+                        result_f.append(len(q))
+                        q.append(c)
+                    else:
+                        result_f.append(res_childi)
+                result.append(result_f)
+            else:
+                assert not 'has implemented'
+        #calc
+        assert len(q) == len(result)
+        for i in range(len(q)-1, -1, -1):
+            #print(i)
+            #print(q[i])
+            #print(result[i])
+            type_i = calc_node_type[i]
+            if type_i != NODE_LEAF:
+                node = q[i]
+                if type_i == NODE_PRODUCT:
+                    tmp_children_list = [CONST_ONE if j is None else result[j] for j in result[i]]
+                    result[i] = prod_likelihood(node, tmp_children_list)
+                    # if node.qdcorr is not None:
+                    #     #print(self._probability_qspn_qdcorr(query, node, attr))
+                    #     result[i] = np.array([max(0.0, min(1.0, result[i][0] * self._probability_qspn_qdcorr(query, node, attr)))])
+                elif type_i == NODE_QSUM:
+                    result[i] = result[result[i]]
+                elif type_i == NODE_SUM:
+                    #tmp_children_list = [np.array([0.0]) if j is None else result[j] for j in result[i]]
+                    tmp_children_list = [j if type(j) is np.ndarray else result[j] for j in result[i]]
+                    result[i] = sum_likelihood(node, tmp_children_list)
+                else:
+                    assert not 'has implemented'
+        return result[0]
+
+    def _probability_pbfs_nasupport_opt(self, query, root, attr, query_scope):
+        global CONST_ONE, NEG_INF, POS_INF, NODE_LEAF, NODE_PRODUCT, NODE_QSUM, NODE_SUM
+        #print('_probability_pbfs_opt')
+        # query_scope = set()
+        # # for i in range(query[0].shape[1]):
+        # #     if query[0][0, i] != float('-inf') or query[1][0, i] != float('inf'):
+        # #         query_scope.add(i)
+        # for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])):
+        #     if l != -np.inf or r != np.inf:
+        #         query_scope.add(ith)
+        #query_scope = set(ith for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])) if l != NEG_INF or r != POS_INF)
+        #print(np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0])
+        # query_scope = np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0]
+        #bfs
+        q = []
+        f = -1
+        q.append(root)
+        result = []
+        calc_node_type = []
+        while len(q) > f + 1:
+            f += 1
+            node = q[f]
+            if isinstance(node, Leaf):
+                calc_node_type.append(NODE_LEAF)
+                if node.scope[0] not in query_scope:
+                    result.append(CONST_ONE)
+                else:
+                    result.append(node.query(query, attr))
+            elif isinstance(node, Product):
+                calc_node_type.append(NODE_PRODUCT)
+                # query_col_access = (query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf)
+                # result.append([])
+                # for i in node.children:
+                #     if query_col_access[i.scope].any():
+                #         result[-1].append(len(q))
+                #         q.append(i)
+                #     else:
+                #         result[-1].append(None)
+                result_f = []
+                for i in node.children:
+                    # scope_intersect = False
+                    # for j in i.scope:
+                    #     if j in query_scope:
+                    #         result[-1].append(len(q))
+                    #         q.append(i)
+                    #         scope_intersect = True
+                    #         break
+                    #scope_intersect = (len(query_scope.intersection(i.scope)) > 0)
+                    #scope_intersect = np.isin(i.scope, query_scope).any()
+                    if query_scope.isdisjoint(i.scope):
+                        result_f.append(None)
+                    else:
+                        result_f.append(len(q))
+                        q.append(i)
+                result.append(result_f)
+            elif isinstance(node, QSum):
+                calc_node_type.append(NODE_QSUM)
+                # children = qsplit_maxcut_which_child(node, query)
+                # result.append([])
+                # for i in children:
+                #     result[-1].append(len(q))
+                #     q.append(i)
+                child = qsplit_maxcut_which_child_opt(node, query)
+                result.append(len(q))
+                q.append(child)
+            elif isinstance(node, Sum):
+                calc_node_type.append(NODE_SUM)
+                result_f = []
+                #print(node.scope)
+                #print(node.node_error[1]['data_max'])
+                #print(node.node_error[1]['data_min'])
+                #print(query)
+                #exit(-1)
+                for i, c in enumerate(node.children):
+                    res_childi = sum_prune_by_datadomain_nasupport(node, i, query)
+                    if res_childi is None:
+                        result_f.append(len(q))
+                        q.append(c)
+                    else:
+                        result_f.append(res_childi)
+                result.append(result_f)
+            else:
+                assert not 'has implemented'
+        #calc
+        assert len(q) == len(result)
+        for i in range(len(q)-1, -1, -1):
+            #print(i)
+            #print(q[i])
+            #print(result[i])
+            type_i = calc_node_type[i]
+            if type_i != NODE_LEAF:
+                node = q[i]
+                if type_i == NODE_PRODUCT:
+                    # tmp_children_list = [CONST_ONE if j is None else result[j] for j in result[i]]
+                    # result[i] = prod_likelihood(node, tmp_children_list)
+
+                    prod_result_i = CONST_ONE.copy()
+                    for j in result[i]:
+                        if j is not None:
+                            prod_result_i *= result[j]
+                    result[i] = prod_result_i
+
+                    # if node.qdcorr is not None:
+                    #     #print(self._probability_qspn_qdcorr(query, node, attr))
+                    #     result[i] = np.array([max(0.0, min(1.0, result[i][0] * self._probability_qspn_qdcorr(query, node, attr)))])
+                elif type_i == NODE_QSUM:
+                    result[i] = result[result[i]]
+                elif type_i == NODE_SUM:
+                    #tmp_children_list = [np.array([0.0]) if j is None else result[j] for j in result[i]]
+                    # tmp_children_list = [j if type(j) is np.ndarray else result[j] for j in result[i]]
+                    # result[i] = sum_likelihood(node, tmp_children_list)
+                    
+                    dot_result_i = np.array([0.0])
+                    for jth, j in enumerate(result[i]):
+                        pj = j if type(j) is np.ndarray else result[j]
+                        wj = node.weights[jth]
+                        dot_result_i += pj * wj
+                    result[i] = dot_result_i
+                else:
+                    assert not 'has implemented'
+        return result[0]
+
+    def _probability_pbfs_nanonsupport_opt(self, query, root, attr):
+        global CONST_ONE, NEG_INF, POS_INF, NODE_LEAF, NODE_PRODUCT, NODE_QSUM, NODE_SUM
+        # POS_INF = np.inf
+        # NEG_INF = -POS_INF
+        # CONST_ONE = np.array([1.0])
+        #print('_probability_pbfs_opt')
+        # query_scope = set()
+        # # for i in range(query[0].shape[1]):
+        # #     if query[0][0, i] != float('-inf') or query[1][0, i] != float('inf'):
+        # #         query_scope.add(i)
+        # for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])):
+        #     if l != -np.inf or r != np.inf:
+        #         query_scope.add(ith)
+        query_scope = set(ith for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])) if l != NEG_INF or r != POS_INF)
+        #print(np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0])
+        # query_scope = np.where((query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf))[0]
+        #bfs
+        q = []
+        f = -1
+        q.append(root)
+        result = []
+        calc_node_type = []
+        # NODE_LEAF = 0
+        # NODE_PRODUCT = 1
+        # NODE_QSUM = 2
+        # NODE_SUM = 3
+        while len(q) > f + 1:
+            f += 1
+            node = q[f]
+            if isinstance(node, Leaf):
+                calc_node_type.append(NODE_LEAF)
+                # if node.scope[0] not in query_scope:
+                #     result.append(CONST_ONE)
+                # else:
+                result.append(node.query(query, attr))
+            elif isinstance(node, Product):
+                calc_node_type.append(NODE_PRODUCT)
+                # query_col_access = (query[0][0, :] != -np.inf) | (query[1][0, :] != np.inf)
+                # result.append([])
+                # for i in node.children:
+                #     if query_col_access[i.scope].any():
+                #         result[-1].append(len(q))
+                #         q.append(i)
+                #     else:
+                #         result[-1].append(None)
+                result_f = []
+                for i in node.children:
+                    # scope_intersect = False
+                    # for j in i.scope:
+                    #     if j in query_scope:
+                    #         result[-1].append(len(q))
+                    #         q.append(i)
+                    #         scope_intersect = True
+                    #         break
+                    #scope_intersect = (len(query_scope.intersection(i.scope)) > 0)
+                    #scope_intersect = np.isin(i.scope, query_scope).any()
+                    if query_scope.isdisjoint(i.scope):
+                        result_f.append(None)
+                    else:
+                        result_f.append(len(q))
+                        q.append(i)
+                result.append(result_f)
+            elif isinstance(node, QSum):
+                calc_node_type.append(NODE_QSUM)
+                # children = qsplit_maxcut_which_child(node, query)
+                # result.append([])
+                # for i in children:
+                #     result[-1].append(len(q))
+                #     q.append(i)
+                child = qsplit_maxcut_which_child_opt(node, query)
+                result.append(len(q))
+                q.append(child)
+            elif isinstance(node, Sum):
+                calc_node_type.append(NODE_SUM)
+                result_f = []
+                #print(node.scope)
+                #print(node.node_error[1]['data_max'])
+                #print(node.node_error[1]['data_min'])
+                #print(query)
+                #exit(-1)
+                for i, c in enumerate(node.children):
+                    res_childi = sum_prune_by_datadomain(node, i, query)
+                    if res_childi is None:
+                        result_f.append(len(q))
+                        q.append(c)
+                    else:
+                        result_f.append(res_childi)
+                result.append(result_f)
+            else:
+                assert not 'has implemented'
+        #calc
+        assert len(q) == len(result)
+        for i in range(len(q)-1, -1, -1):
+            #print(i)
+            #print(q[i])
+            #print(result[i])
+            type_i = calc_node_type[i]
+            if type_i != NODE_LEAF:
+                node = q[i]
+                if type_i == NODE_PRODUCT:
+                    # tmp_children_list = [CONST_ONE if j is None else result[j] for j in result[i]]
+                    # result[i] = prod_likelihood(node, tmp_children_list)
+
+                    prod_result_i = CONST_ONE.copy()
+                    for j in result[i]:
+                        if j is not None:
+                            prod_result_i *= result[j]
+                    result[i] = prod_result_i
+
+                    # if node.qdcorr is not None:
+                    #     #print(self._probability_qspn_qdcorr(query, node, attr))
+                    #     result[i] = np.array([max(0.0, min(1.0, result[i][0] * self._probability_qspn_qdcorr(query, node, attr)))])
+                elif type_i == NODE_QSUM:
+                    result[i] = result[result[i]]
+                elif type_i == NODE_SUM:
+                    #tmp_children_list = [np.array([0.0]) if j is None else result[j] for j in result[i]]
+                    # tmp_children_list = [j if type(j) is np.ndarray else result[j] for j in result[i]]
+                    # result[i] = sum_likelihood(node, tmp_children_list)
+                    
+                    dot_result_i = np.array([0.0])
+                    for jth, j in enumerate(result[i]):
+                        pj = j if type(j) is np.ndarray else result[j]
+                        wj = node.weights[jth]
+                        dot_result_i += pj * wj
+                    result[i] = dot_result_i
+                else:
+                    assert not 'has implemented'
+        return result[0]
+
+    def _probability_pbfs_nasupport(self, query, root, attr):
+        query_scope = set()
+        # # for i in range(query[0].shape[1]):
+        # #     if query[0][0, i] != float('-inf') or query[1][0, i] != float('inf'):
+        # #         query_scope.add(i)
+        for ith, (l, r) in enumerate(zip(query[0][0], query[1][0])):
+            if l != -np.inf or r != np.inf:
+                query_scope.add(ith)
+        #bfs
+        q = []
+        f = -1
+        q.append(root)
+        result = []
+        while len(q) > f + 1:
+            f += 1
+            node = q[f]
+            if isinstance(node, Leaf):
+                if node.scope[0] not in query_scope:
+                    result.append(np.array([1.0]))
+                else:
+                    result.append(node.query(query, attr))
+            elif isinstance(node, Product):
+                result.append([])
+                for i in node.children:
+                    # scope_intersect = False
+                    # for j in i.scope:
+                    #     if j in query_scope:
+                    #         result[-1].append(len(q))
+                    #         q.append(i)
+                    #         scope_intersect = True
+                    #         break
+                    scope_intersect = (not query_scope.isdisjoint(i.scope))
+                    #scope_intersect = (len(query_scope.intersection(i.scope)) > 0)
+                    #scope_intersect = np.isin(i.scope, query_scope).any()
+                    if not scope_intersect:
+                        result[-1].append(None)
+                    else:
+                        result[-1].append(len(q))
+                        q.append(i)
+            elif isinstance(node, QSum):
+                child = qsplit_maxcut_which_child(node, query)
+                result.append([len(q)])
+                q.append(child)
+            elif isinstance(node, Sum):
+                result.append([])
+                #print(node.scope)
+                #print(node.node_error[1]['data_max'])
+                #print(node.node_error[1]['data_min'])
+                #print(query)
+                #exit(-1)
+                for i, c in enumerate(node.children):
+                    res_childi = sum_prune_by_datadomain_nasupport(node, i, query)
+                    if res_childi is None:
+                        result[-1].append(len(q))
+                        q.append(c)
+                    else:
+                        result[-1].append(res_childi)
+            else:
+                assert not 'has implemented'
+        #calc
+        assert len(q) == len(result)
+        for i in range(len(q)-1, -1, -1):
+            #print(i)
+            #print(q[i])
+            #print(result[i])
+            if type(result[i]) is list:
+                node = q[i]
+                if isinstance(node, Product):
+                    tmp_children_list = [np.array([1.0]) if j is None else result[j] for j in result[i]]
+                    result[i] = prod_likelihood(node, tmp_children_list)
+                    # if node.qdcorr is not None:
+                    #     #print(self._probability_qspn_qdcorr(query, node, attr))
+                    #     result[i] = np.array([max(0.0, min(1.0, result[i][0] * self._probability_qspn_qdcorr(query, node, attr)))])
+                elif isinstance(node, QSum):
+                    tmp_children_list = [result[j] for j in result[i]]
+                    result[i] = Qsum_likelihood(node, tmp_children_list)
+                elif isinstance(node, Sum):
+                    #tmp_children_list = [np.array([0.0]) if j is None else result[j] for j in result[i]]
+                    tmp_children_list = [j if type(j) is np.ndarray else result[j] for j in result[i]]
+                    result[i] = sum_likelihood(node, tmp_children_list)
+                else:
+                    assert not 'has implemented'
+        return result[0]
+
     def _probability_qspnfast_dfs(self, query, node, attr):
         if isinstance(node, Leaf):
             result = node.query(query, attr)
@@ -466,7 +920,7 @@ class FSPN:
         return probs
 
 
-    def probability(self, query, node=None, query_attr=None, calculated=dict(), exist_qsum=False, first_time_recur=False):
+    def probability(self, query, node=None, query_attr=None, calculated=dict(), exist_qsum=False, first_time_recur=False, nasupport=False, query_scope=None):
         """
         Calculate the probability
         :param query: two numpy arrays of value refers to the lower and upper range of each attribute
@@ -504,9 +958,12 @@ class FSPN:
         if not exist_fact:
             #This node does not have factorize node children
             #prob = self._probability_left_most(query, node, query_attr)
-            if first_time_recur:
+            if first_time_recur and exist_qsum:
                 if PBFS_PROB:
-                    prob = self._probability_pbfs(query, node, query_attr)
+                    if nasupport:
+                        prob = self._probability_pbfs_nasupport_opt(query, node, query_attr, query_scope)
+                    else:
+                        prob = self._probability_pbfs_nanonsupport_opt(query, node, query_attr)
                 elif DFS_PROB:
                     prob = self._probability_qspnfast_dfs(query, node, query_attr)
                 elif exist_qsum:
@@ -530,7 +987,6 @@ class FSPN:
                 return prob
             else:
                 return self.probability(query, node, query_attr, calculated)
-
 
     def eval_fact_node(self, query, node, query_attr, calculated):
         """

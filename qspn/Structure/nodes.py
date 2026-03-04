@@ -524,15 +524,17 @@ def qsplit_maxcut_cover_score(node, i, query):
         return QSPLIT_SCORE_RATIO * exact_score + (1 - QSPLIT_SCORE_RATIO) * fuzzy_score
 
 def qsplit_maxcut_which_child(node, query):
-    x = []
-    opt_score = -1
-    for i in range(len(node.children)):
-        c = node.children[i]
-        score = qsplit_maxcut_cover_score(node, i, query)
-        if score > opt_score:
-            opt_score = score
-            x = [c]
-    assert len(x) == 1
+    # x = []
+    # opt_score = -1
+    # for i in range(len(node.children)):
+    #     c = node.children[i]
+    #     score = qsplit_maxcut_cover_score(node, i, query)
+    #     if score > opt_score:
+    #         opt_score = score
+    #         x = [c]
+    score = [qsplit_maxcut_cover_score(node, ith, query) for ith, _ in enumerate(node.children)]
+    x = node.children[np.argmax(score)]
+    #assert len(x) == 1
     # query_pred = [1] * len(node.scope)
     # pred_n = len(query[0])
     # assert pred_n == len(query[1])
@@ -544,7 +546,31 @@ def qsplit_maxcut_which_child(node, query):
     #         print(query_pred, opt_score, 'NOT cover')
     #     else:
     #         print(query_pred, opt_score)
-    return x
+    return [x]
+
+def qsplit_maxcut_which_child_opt(node, query):
+    # x = []
+    # opt_score = -1
+    # for i in range(len(node.children)):
+    #     c = node.children[i]
+    #     score = qsplit_maxcut_cover_score(node, i, query)
+    #     if score > opt_score:
+    #         opt_score = score
+    #         x = [c]
+    score = [qsplit_maxcut_cover_score(node, ith, query) for ith, _ in enumerate(node.children)]
+    #assert len(x) == 1
+    # query_pred = [1] * len(node.scope)
+    # pred_n = len(query[0])
+    # assert pred_n == len(query[1])
+    # for j, c in enumerate(node.scope):
+    #     if query[0][0, c] == float('-inf') and query[1][0, c] == float('inf'):
+    #         query_pred[j] = 0
+    # if len(node.scope) > 5:
+    #     if opt_score < sum(query_pred):
+    #         print(query_pred, opt_score, 'NOT cover')
+    #     else:
+    #         print(query_pred, opt_score)
+    return node.children[np.argmax(score)]
 
 def qsplit_maxcut_which_childi(node, query):
     x = []

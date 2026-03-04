@@ -70,7 +70,7 @@ def clusters_by_adjacency_matrix(adm, threshold, n_features):
 def split_data_by_clusters(data, clusters, scope, centers=None, rows=True, joined_downscale_factor_cols=None):
     print('centers:', centers)
     unique_clusters = np.sort(np.unique(clusters))
-    if joined_downscale_factor_cols is not None and not (centers is None or len(unique_clusters) == centers.shape[0]):
+    if len(unique_clusters) == 1 or (joined_downscale_factor_cols is not None and not (centers is None or len(unique_clusters) == centers.shape[0])):
         random_clusters = np.array([random.randint(0, centers.shape[0]-1) for i in range(data.shape[0])])
         assert random_clusters.shape == clusters.shape
         clusters = random_clusters

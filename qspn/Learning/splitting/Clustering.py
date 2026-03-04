@@ -5,6 +5,7 @@ from Learning.splitting.Base import split_data_by_clusters, preproc
 from Learning.splitting.Rect_approaximate import rect_approximate
 from Learning.splitting.Grid_clustering import get_optimal_attribute, get_optimal_split
 import logging
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,12 @@ def get_split_rows_KMeans(n_clusters=2, pre_proc=None, ohe=False, seed=17, max_s
     def split_rows_KMeans(local_data, ds_context, scope, rdc_mat=None, joined_downscale_factor_cols=None):
         #nan changed to mean for each scope, need deepcopy
         origin_local_data = local_data
-        #print(origin_local_data)
+        if np.isnan(origin_local_data).any():
+            #origin_local_data = deepcopy(local_data)
+            local_data = fit_nan(origin_local_data)
+            print('origin', origin_local_data)
+            print('fitted', local_data)
+            assert not np.isnan(local_data).any(), 'All nan local_data?'
         if joined_downscale_factor_cols is not None:
             local_data = fit_nan(local_data)
         data = preproc(local_data, ds_context, pre_proc, ohe)
